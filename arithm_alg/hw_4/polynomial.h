@@ -16,12 +16,15 @@
 namespace poly_detail 
 {
 
-    //побитовое возведение 
+    //побитовое возведение в степень
     template<typename T>
     T power(const T& base, int exp) 
     {
-        if (exp < 0) throw std::invalid_argument("Negative exponent in power()");
-        if (exp == 0) return T(1);
+        if (exp < 0) 
+            throw std::invalid_argument("Negative exponent in power()");
+        if (exp == 0) 
+            return T(1);
+
         T result(1);
         T b = base;
         int e = exp;
@@ -34,7 +37,6 @@ namespace poly_detail
         return result;
     }
 
-    //побитовое возведение может накапливать ошибки округления
     template<>
     double power<double>(const double& base, int exp) 
     {
@@ -67,30 +69,63 @@ namespace poly_detail
         return std::abs(v) < 1e-15;
     }
 
+    template<typename T>
+    T divCoeff(const T& a, const T& b)
+    {
+        if (isZeroCoeff(b)) {
+            throw std::runtime_error("Division by zero coefficient");
+        }
+        return a / b;
+    }
+
+    template<>
+    inline int divCoeff<int>(const int& a, const int& b)
+    {
+        if (b == 0) {
+            throw std::runtime_error("Division by zero coefficient");
+        }
+
+        if (a % b != 0) {
+            throw std::runtime_error("Non-exact division in integer coefficients");
+        }
+
+        return a / b;
+    }
+
 }
 
-template<typename Coef>
+template<typename CoefType>
 struct Monomial 
 {
-    Coef coeff;
+    CoefType coeff;
     std::map<std::string, int> exponents;
 };
 
-template<typename Coef>
+enum class MonomialOrder { LEX, GRLEX, GREVLEX, INVLEX, RINVLEX };
+
+template<typename CoefType>
+bool compareMonomials(const Monomial<CoefType>& a,
+    const Monomial<CoefType>& b,
+    const std::vector<std::string>& variables,
+    MonomialOrder order);
+
+
+template<typename CoefType>
 struct Node 
 {
     std::map<int, Node*> children;
 
-    Coef coeff;
+    CoefType coeff;
 
     //конечный узел
     bool isTerminal;
 
     int degree;
 
-    Node() : coeff(Coef()), isTerminal(false), degree(0) {}
+    Node() : coeff(CoefType()), isTerminal(false), degree(0) {}
 
-    ~Node() {
+    ~Node() 
+    {
         for (auto& kv : children) {
             delete kv.second;
         }
@@ -114,17 +149,18 @@ struct Node
 };
 
 
-template<typename Coef>
+template<typename CoefType>
 class Polynomial {
 
 public:
     //псевдоним типа
-    using MonomType = Monomial<Coef>;
+    using MonomType = Monomial<CoefType>;
 
     explicit Polynomial(const std::vector<std::string>& vars);
 
+    //многочлен из одного монома
     Polynomial(const std::vector<std::string>& vars,
-        const Coef& coeff,
+        const CoefType& coeff,
         const std::map<std::string, int>& exponents);
 
     Polynomial(const Polynomial& other);
@@ -138,20 +174,21 @@ public:
     Polynomial& operator=(Polynomial&& other) noexcept;
 
     //операции
-    void addTerm(const Coef& coeff,
+    void addTerm(const CoefType& coeff,
         const std::map<std::string, int>& exponents);
 
-    Coef getCoeff(const std::map<std::string, int>& exponents) const;
+    CoefType getCoeff(const std::map<std::string, int>& exponents) const;
 
     bool isZero() const;
 
     std::vector<MonomType> support() const;
 
-    Coef evaluate(const std::map<std::string, Coef>& point) const;
+    CoefType evaluate(const std::map<std::string, CoefType>& point) const;
 
+    //однородность
     int homogeneousDegree() const;
 
-    Polynomial<Coef> homogeneousPart(int degree) const;
+    Polynomial<CoefType> homogeneousPart(int degree) const;
 
     const std::vector<std::string>& variables() const { return variables_; }
 
@@ -182,28 +219,71 @@ public:
     template<typename C>
     friend std::ostream& operator<<(std::ostream& os, const Polynomial<C>& p);
 
+    static std::string monomToString(const CoefType& coeff,
+        const std::map<std::string, int>& exp);
 private:
-    Node<Coef>* root_;
+    Node<CoefType>* root_;
     std::vector<std::string> variables_;
 
 
-    void collectSupport(const Node<Coef>* node,
+    void collectSupport(const Node<CoefType>* node,
         int varIdx,
         std::map<std::string, int>& current,
         std::vector<MonomType>& result) const;
 
-    // Рекурсивное добавление всех мономов из поддерева src в *this
+    // рекурсивное добавление всех мономов из поддерева src в *this
     // с умножением коэффициентов на factor
-    void addSubtree(const Node<Coef>* src,
+    void addSubtree(const Node<CoefType>* src,
         int varIdx,
         std::map<std::string, int>& current,
-        const Coef& factor);
+        const CoefType& factor);
 
     // Проверка совместимости переменных двух многочленов
     void checkCompat(const Polynomial& other) const;
 
-    static std::string monomToString(const Coef& coeff,
-        const std::map<std::string, int>& exp);
+    
+
+
+    void multiplyTrees(
+        const Node<CoefType>* nodeA,
+        const Node<CoefType>* nodeB,
+        int varIdx,
+        std::map<std::string, int>& current,
+        Polynomial<CoefType>& result) const;
+
+    CoefType evaluateNode(
+        const Node<CoefType>* node,
+        int varIdx,
+        CoefType accumulated,
+        const std::map<std::string, CoefType>& point) const;
+
+
+
+
+    //hw 5
+public:
+    MonomType leadingMonomial(MonomialOrder order) const;
+    MonomType leadingTerm(MonomialOrder order) const;
+    CoefType  leadingCoefficient(MonomialOrder order) const;
+    std::vector<int> multiDegree(MonomialOrder order) const;
+
+
+    struct DivisionResult 
+    {
+        std::vector<Polynomial> quotients;
+        Polynomial remainder;
+
+        DivisionResult(const std::vector<std::string>& vars, int s)
+            : quotients(s, Polynomial(vars)), remainder(vars) {
+        }
+    };
+
+    DivisionResult divideBy(const std::vector<Polynomial>& F,
+        MonomialOrder order) const;
+
 };
+
+
+
 
 #include "Polynomial.hpp"
