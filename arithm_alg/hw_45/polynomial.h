@@ -281,6 +281,17 @@ public:
     DivisionResult divideBy(const std::vector<Polynomial>& F,
         MonomialOrder order) const;
 
+
+
+
+    //hw 7
+    static Polynomial S_polynomial(const Polynomial& f, const Polynomial& g, MonomialOrder order);
+    static bool isGroebnerBasis(const std::vector<Polynomial>& G, MonomialOrder order);
+    static std::map<std::string, int> lcm_exponents(const std::map<std::string, int>& a, const std::map<std::string, int>& b);
+
+private:
+    static std::map<std::string, int> divide_exponents(const std::map<std::string, int>& num, const std::map<std::string, int>& den);
+
 };
 
 

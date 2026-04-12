@@ -619,7 +619,6 @@ Monomial<CoefType> Polynomial<CoefType>::leadingMonomial(MonomialOrder order) co
     return lm;
 }
 
-
 template<typename CoefType>
 Monomial<CoefType> Polynomial<CoefType>::leadingTerm(MonomialOrder order) const
 {
@@ -749,4 +748,74 @@ Polynomial<CoefType>::divideBy(const std::vector<Polynomial>& F,
     }
 
     return result;
+}
+
+
+
+//hw 7
+template<typename CoefType>
+std::map<std::string, int> Polynomial<CoefType>::lcm_exponents(
+    const std::map<std::string, int>& a, const std::map<std::string, int>& b)
+{
+    std::map<std::string, int> res;
+    for (auto& kv : a)
+        res[kv.first] = kv.second;
+
+    for (auto& kv : b) {
+        auto it = res.find(kv.first);
+        if (it == res.end()) 
+            res[kv.first] = kv.second;
+        else 
+            it->second = std::max(it->second, kv.second);
+    }
+    return res;
+}
+
+template<typename CoefType>
+std::map<std::string, int> Polynomial<CoefType>::divide_exponents(
+    const std::map<std::string, int>& num, const std::map<std::string, int>& den)
+{
+    std::map<std::string, int> res;
+    for (auto& kv : num) {
+        int d = 0;
+        auto it = den.find(kv.first);
+        if (it != den.end())
+            d = it->second;
+        if (kv.second - d > 0)
+            res[kv.first] = kv.second - d;
+    }
+    return res;
+}
+
+template<typename CoefType>
+Polynomial<CoefType> Polynomial<CoefType>::S_polynomial(
+    const Polynomial& f, const Polynomial& g, MonomialOrder order)
+{
+    MonomType ltF = f.leadingTerm(order);
+    MonomType ltG = g.leadingTerm(order);
+    std::map<std::string, int> gamma = lcm_exponents(ltF.exponents, ltG.exponents); 
+    std::map<std::string, int> expF = divide_exponents(gamma, ltF.exponents);
+    std::map<std::string, int> expG = divide_exponents(gamma, ltG.exponents);
+    CoefType invLcF = CoefType(1) / ltF.coeff;
+    CoefType invLcG = CoefType(1) / ltG.coeff;
+    Polynomial termF(f.variables_, invLcF, expF);
+    Polynomial termG(g.variables_, invLcG, expG);
+    return termF * f - termG * g;
+}
+
+
+template<typename CoefType>
+bool Polynomial<CoefType>::isGroebnerBasis(
+    const std::vector<Polynomial>& G, MonomialOrder order)
+{
+    int s = (int)G.size();
+    for (int i = 0; i < s - 1; ++i) {
+        for (int j = i + 1; j < s; ++j) {
+            Polynomial sp = S_polynomial(G[i], G[j], order);
+            auto res = sp.divideBy(G, order);
+            if (!res.remainder.isZero())
+                return false;
+        }
+    }
+    return true;
 }
